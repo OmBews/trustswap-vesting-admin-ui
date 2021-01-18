@@ -15,12 +15,14 @@
           @change="onSelectFile"
         />
       </div>
-      <div v-if="parsed">
-        <button class="round send-but">Send to the Contract</button>
+      <div v-if="parsed" class="send-container">
         <div :style="{ color: '#070846' }">
           Before send to the contract, please double check if the csv is
           correct.
         </div>
+        <button class="round send-but" @click="uploadCsv">
+          Send to the Contract
+        </button>
       </div>
     </div>
   </div>
@@ -30,11 +32,17 @@
 import { mapState } from "vuex";
 import BigNumber from "bignumber.js";
 import readXlsxFile from "read-excel-file";
+import moment from "moment";
 export default {
   data: () => ({
     file: null,
     parsed: false,
-    data: null,
+    data: {
+      users: [],
+      amounts: [],
+      periods: [],
+      startTimes: [],
+    },
   }),
   computed: {
     ...mapState({
@@ -50,40 +58,106 @@ export default {
     },
   },
   methods: {
-    uploadCsv() {},
+    convertPeriod(data) {
+      const lastChar = data.substr(data.length - 1);
+      const num = parseInt(data.substr(0, data.length - 1));
+      if (lastChar === "M") return num * 24 * 31;
+      else if (lastChar === "W") return num * 24 * 7;
+      else if (lastChar === "D") return num * 24;
+      else if (lastChar === "H") return num;
+      return num;
+    },
+    isValidPeriod(data) {
+      const lastChar = data.substr(data.length - 1);
+      if (
+        lastChar !== "M" &&
+        lastChar !== "D" &&
+        lastChar !== "H" &&
+        lastChar !== "W"
+      ) {
+        return false;
+      } else if (!parseInt(data.substr(0, data.length - 1))) return false;
+      return true;
+    },
+    isValidDate(date) {
+      return (
+        moment(date)
+          .toDate()
+          .toString() !== "Invalid Date" || date === "Immediately"
+      );
+    },
     async onSelectFile(e) {
       this.file = event.target.files ? event.target.files[0] : null;
       if (!this.file) return;
-      this.data = await readXlsxFile(this.file);
-      if (!this.data) {
+      const data = await readXlsxFile(this.file);
+      if (!data) {
         this.$snotify.error("CSV Loading failed");
         return;
       }
       if (
-        this.data[0][0] !== "Address" ||
-        this.data[0][1] !== "Period" ||
-        this.data[0][2] !== "Amount"
+        data[0][0] !== "Address" ||
+        data[0][1] !== "StartTime" ||
+        data[0][2] !== "Period" ||
+        data[0][3] !== "Amount"
       ) {
         this.$snotify.error(
           "CSV data is invalid. The first row should be Address, Period and Amount"
         );
         return;
       }
-      const rows = this.data.slice(1);
-      rows.forEach((row) => {
+      const rows = data.slice(1);
+      this.data = { users: [], amounts: [], periods: [], startTimes: [] };
+      rows.forEach((row, index) => {
         try {
           if (!this.web3.utils.isAddress(row[0])) {
             throw new Error(`${row[0]} is not valid address`);
+          } else if (!this.isValidDate(row[1])) {
+            throw new Error(`StartTime format is invalid on ${index + 2} line`);
+          } else if (!this.isValidPeriod(row[2])) {
+            throw new Error(`Period format is invalid on ${index + 2} line`);
+          } else if (!parseInt(row[3])) {
+            throw new Error(`Amount is invalid on ${index + 2} line`);
           }
+          const startTimestamp =
+            row[1] === "Immediately"
+              ? Math.round(new Date().getTime() / 1000)
+              : Math.round(
+                  new Date(row[1]).getTime() / 1000 - 43200 //sub 43200 for 12 hours timestamp different from excel and javascript
+                );
+          this.data.users.push(row[0]);
+          this.data.amounts.push(parseInt(row[3]));
+          this.data.periods.push(this.convertPeriod(row[2]));
+          this.data.startTimes.push(startTimestamp);
         } catch (err) {
           this.$snotify.error(err.message);
         }
       });
+      this.parsed = true;
     },
     async loadContract() {
       if (!this.tokenLocker) return;
     },
-    uploadCsv() {},
+    async uploadCsv() {
+      try {
+        const {
+          transactionHash,
+        } = await this.tokenLocker.methods
+          .sendLockTokenMany(
+            this.data.users,
+            this.data.amounts,
+            this.data.startTimes,
+            this.data.periods
+          )
+          .send({
+            from: this.address,
+          });
+        const tx = await this.web3.eth.getTransactionReceipt(transactionHash);
+        if (tx) this.$snotify.success(`Successfully locked the tokens`);
+      } catch (error) {
+        console.error(error);
+        this.$snotify.error(error.message);
+      }
+    },
   },
   async mounted() {
     await this.loadContract();
@@ -117,6 +191,11 @@ export default {
   }
   .send-but {
     font-size: 2rem;
+  }
+  .send-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
   }
   .footer {
     justify-content: center;

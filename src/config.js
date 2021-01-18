@@ -2,9 +2,9 @@ require("dotenv").config();
 const config = {
   mainnet: {},
   rinkeby: {
-    locker: "0x29492ea7857D62fE7704d1efe16CBC6EAF895191",
+    tokenLocker: "0x2CEfcB282E037245E1BBF9210252c308ffC12fEd",
     token: "0x22b29196c49aA443d3E65297Eb5faE21D9CF1fe7",
-    admin: "0x5518876726C060b2D3fCda75c0B9f31F13b78D07",
+    deployer: "0x5518876726C060b2D3fCda75c0B9f31F13b78D07",
   },
 };
 

@@ -17,6 +17,7 @@
     "@babel/preset-env": "^7.12.1",
     "@babel/runtime": "^7.12.5",
     "@metamask/detect-provider": "^1.2.0",
+    "moment": "^2.29.1",
     "read-excel-file": "^5.0.0",
     "vue": "^2.6",
     "vue-router": "^3.0",

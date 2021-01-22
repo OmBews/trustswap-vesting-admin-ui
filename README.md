@@ -1,6 +1,4 @@
-# Vue 2 boilerplate with webpack 4
-
-Vue 2 boilerplate with webpack 4 and Eslint. Completely stable and clean repo.
+# Trustswap Token vesting admin ui
 
 ```
 # install dependencies

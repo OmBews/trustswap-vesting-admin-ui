@@ -125,7 +125,9 @@ export default {
                   new Date(row[1]).getTime() / 1000 - 43200 //sub 43200 for 12 hours timestamp different from excel and javascript
                 );
           this.data.users.push(row[0]);
-          this.data.amounts.push(parseInt(row[3]));
+          this.data.amounts.push(
+            this.web3.utils.toWei(Number(row[3]).toString())
+          );
           this.data.periods.push(this.convertPeriod(row[2]));
           this.data.startTimes.push(startTimestamp);
         } catch (err) {
